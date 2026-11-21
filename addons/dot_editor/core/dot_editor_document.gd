@@ -11,6 +11,9 @@ extends RefCounted
 
 const VERSION := 1
 
+## An item was placed, moved, scaled or removed (`kind` is "place", "move", "scale" or "remove"), or the document was cleared or loaded (id 0).
+signal changed(kind: String, id: int)
+
 var config: DotEditorConfig = DotEditorConfig.new()
 var title: String = ""
 var owner: String = ""
@@ -20,8 +23,15 @@ var costs: Dictionary = {}
 ## Optional Callable(prop: String) -> bool; the catalogue (GameSpice Props, a pack) says which ids exist. Empty accepts any id the config allows.
 var knows: Callable = Callable()
 
+## Counts every change; a client that remembers it knows whether its copy is stale.
+var revision: int = 0
+
 var _items: Dictionary = {}
 var _next_id: int = 1
+# Running totals, so a placement does not walk every item to check its budgets.
+var _item_cost: Dictionary = {}
+var _total: float = 0.0
+var _per_actor: Dictionary = {}
 
 
 func count() -> int:
@@ -41,11 +51,13 @@ func items() -> Array:
 	return out
 
 
+func has_item(id: int) -> bool:
+	return _items.has(id)
+
+
+## Cost of everything placed, as it was priced when each item went in.
 func total_cost() -> float:
-	var c := 0.0
-	for id: int in _items:
-		c += cost_of(str((_items[id] as Dictionary)["prop"]))
-	return c
+	return _total
 
 
 func cost_of(prop: String) -> float:
@@ -53,11 +65,21 @@ func cost_of(prop: String) -> float:
 
 
 func count_by(actor: String) -> int:
-	var n := 0
+	return int(_per_actor.get(actor, 0))
+
+
+## Ids of the items within `radius` metres of `pos`, in no fixed order.
+func find_near(pos: Vector3, radius: float) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	var r2 := radius * radius
 	for id: int in _items:
-		if str((_items[id] as Dictionary)["by"]) == actor:
-			n += 1
-	return n
+		var a: Array = (_items[id] as Dictionary)["pos"]
+		var dx := float(a[0]) - pos.x
+		var dy := float(a[1]) - pos.y
+		var dz := float(a[2]) - pos.z
+		if dx * dx + dy * dy + dz * dz <= r2:
+			out.append(id)
+	return out
 
 
 func set_title(actor: String, text: String) -> DotResult:
@@ -84,12 +106,17 @@ func place(actor: String, prop: String, pos: Vector3, yaw: float = 0.0, scale: f
 		return DotResult.fail(DotError.CODE_QUOTA, "the document is full: %d items" % config.max_items)
 	if config.max_items_per_actor > 0 and count_by(actor) >= config.max_items_per_actor:
 		return DotResult.fail(DotError.CODE_QUOTA, "%s has placed %d items already" % [actor, config.max_items_per_actor])
-	if config.max_cost > 0.0 and total_cost() + cost_of(prop) > config.max_cost:
-		return DotResult.fail(DotError.CODE_QUOTA, "over the budget: %.1f of %.1f" % [total_cost() + cost_of(prop), config.max_cost])
+	var price := cost_of(prop)
+	if config.max_cost > 0.0 and _total + price > config.max_cost:
+		return DotResult.fail(DotError.CODE_QUOTA, "over the budget: %.1f of %.1f" % [_total + price, config.max_cost])
 	var id := _next_id
 	_next_id += 1
 	var p := shape.value as Vector3
 	_items[id] = {"id": id, "prop": prop, "pos": [p.x, p.y, p.z], "yaw": fposmod(yaw, 360.0), "scale": scale, "by": actor}
+	_item_cost[id] = price
+	_total += price
+	_per_actor[actor] = int(_per_actor.get(actor, 0)) + 1
+	_touch("place", id)
 	return DotResult.success(id)
 
 
@@ -107,7 +134,84 @@ func move(actor: String, id: int, pos: Vector3, yaw: float = NAN) -> DotResult:
 	it["pos"] = [p.x, p.y, p.z]
 	if not is_nan(yaw):
 		it["yaw"] = fposmod(yaw, 360.0)
+	_touch("move", id)
 	return DotResult.success(id)
+
+
+## Changes an item's scale, within the scale limits.
+func set_scale(actor: String, id: int, scale: float) -> DotResult:
+	var gate := _gate(actor)
+	if not gate.ok:
+		return gate
+	if not _items.has(id):
+		return DotResult.fail(DotError.CODE_INVALID, "no item %d" % id)
+	var it: Dictionary = _items[id]
+	var p: Array = it["pos"]
+	var shape := _shape(Vector3(float(p[0]), float(p[1]), float(p[2])), scale)
+	if not shape.ok:
+		return shape
+	it["scale"] = scale
+	_touch("scale", id)
+	return DotResult.success(id)
+
+
+## Places a copy of an item `offset` away, as `actor`. Success carries the new id; budgets apply.
+func duplicate_item(actor: String, id: int, offset: Vector3) -> DotResult:
+	if not _items.has(id):
+		return DotResult.fail(DotError.CODE_INVALID, "no item %d" % id)
+	var it: Dictionary = _items[id]
+	var p: Array = it["pos"]
+	return place(actor, str(it["prop"]), Vector3(float(p[0]), float(p[1]), float(p[2])) + offset, float(it["yaw"]), float(it["scale"]))
+
+
+## Removes every item `who` placed (a player who left). Success carries how many went.
+func remove_by(actor: String, who: String) -> DotResult:
+	var gate := _gate(actor)
+	if not gate.ok:
+		return gate
+	var gone := 0
+	for id: int in _items.keys():
+		if str((_items[id] as Dictionary)["by"]) == who:
+			_drop(id)
+			gone += 1
+	if gone > 0:
+		_touch("remove", 0)
+	return DotResult.success(gone)
+
+
+## Removes everything. Success carries how many items went.
+func clear(actor: String) -> DotResult:
+	var gate := _gate(actor)
+	if not gate.ok:
+		return gate
+	var n := _items.size()
+	_reset_items()
+	_touch("remove", 0)
+	return DotResult.success(n)
+
+
+## What changed from `older` (a [method to_dict] result) to now: `{added: [ids], removed: [ids], changed: [ids]}`,
+## so a server can send a client only the difference.
+func diff_from(older: Dictionary) -> Dictionary:
+	var before := {}
+	for raw: Variant in older.get("items", []):
+		if raw is Dictionary and (raw as Dictionary).has("id"):
+			before[int((raw as Dictionary)["id"])] = raw
+	var added: Array = []
+	var changed_ids: Array = []
+	for id: int in _items:
+		if not before.has(id):
+			added.append(id)
+		elif (before[id] as Dictionary).hash() != (_items[id] as Dictionary).hash():
+			changed_ids.append(id)
+	var removed: Array = []
+	for id: int in before:
+		if not _items.has(id):
+			removed.append(id)
+	added.sort()
+	removed.sort()
+	changed_ids.sort()
+	return {"added": added, "removed": removed, "changed": changed_ids}
 
 
 func remove(actor: String, id: int) -> DotResult:
@@ -116,7 +220,8 @@ func remove(actor: String, id: int) -> DotResult:
 		return gate
 	if not _items.has(id):
 		return DotResult.fail(DotError.CODE_INVALID, "no item %d" % id)
-	_items.erase(id)
+	_drop(id)
+	_touch("remove", id)
 	return DotResult.success(id)
 
 
@@ -156,14 +261,44 @@ func load_dict(d: Variant) -> DotResult:
 			fresh._items.erase(int(placed.value))
 			it["id"] = id
 			fresh._items[id] = it
+			fresh._item_cost[id] = fresh._item_cost[int(placed.value)]
+			fresh._item_cost.erase(int(placed.value))
 		top = maxi(top, id)
 	fresh._next_id = maxi(fresh._next_id, top + 1)
 	title = fresh.title
 	owner = fresh.owner
 	editors = fresh.editors
 	_items = fresh._items
+	_item_cost = fresh._item_cost
+	_total = fresh._total
+	_per_actor = fresh._per_actor
 	_next_id = fresh._next_id
+	_touch("load", 0)
 	return DotResult.success(_items.size())
+
+
+func _touch(kind: String, id: int) -> void:
+	revision += 1
+	changed.emit(kind, id)
+
+
+func _drop(id: int) -> void:
+	var by := str((_items[id] as Dictionary)["by"])
+	_total -= float(_item_cost.get(id, 0.0))
+	_item_cost.erase(id)
+	_items.erase(id)
+	var n := int(_per_actor.get(by, 0)) - 1
+	if n > 0:
+		_per_actor[by] = n
+	else:
+		_per_actor.erase(by)
+
+
+func _reset_items() -> void:
+	_items.clear()
+	_item_cost.clear()
+	_per_actor.clear()
+	_total = 0.0
 
 
 func _place_as_owner(by: String, prop: String, pos: Vector3, yaw: float, scale: float) -> DotResult:

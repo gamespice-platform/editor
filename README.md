@@ -32,6 +32,16 @@ var saved := JSON.stringify(doc.to_dict())         # the map document
 var back := doc.load_dict(JSON.parse_string(saved))   # checked item by item, untouched on failure
 ```
 
+## More than place, move and remove
+
+- `set_scale`, `duplicate_item`, `remove_by` (clear a player who left) and `clear`, each behind the same permission check.
+- `find_near(pos, radius)` for ids around a point.
+- `changed(kind, id)` signal and a `revision` counter, so a client knows its copy is stale.
+- `diff_from(older_dict)` returns `{added, removed, changed}` ids, so a server sends only the difference.
+- Budgets are kept as running totals: a placement costs the same with ten items or ten thousand.
+
+`examples/editor_demo.gd` walks through them.
+
 ## Settings
 
 Every number is a field on `DotEditorConfig`. The values below are defaults, and the ranges are inspector slider limits, not enforced caps. Set the property from code or a config file to go beyond them; 0 means unlimited where it says so.
@@ -69,7 +79,7 @@ godot --headless --path . --import
 godot --headless --path . res://examples/editor_selftest.tscn
 ```
 
-The self-test is offline and exits non-zero on any failure (5 sections, 40 checks plus the two summary checks).
+The self-test is offline and exits non-zero on any failure (6 sections, 50 checks plus the two summary checks).
 
 ## Status
 

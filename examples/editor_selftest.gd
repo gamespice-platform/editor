@@ -4,8 +4,8 @@ extends Node
 ## Counts sections run to their last line as well as checks, because a script error
 ## aborts a section and not the run.
 
-const EXPECTED_SECTIONS := 5
-const EXPECTED_CHECKS := 40
+const EXPECTED_SECTIONS := 6
+const EXPECTED_CHECKS := 50
 
 var _passed := 0
 var _failed := 0
@@ -19,6 +19,7 @@ func _ready() -> void:
 	_edits()
 	_budgets()
 	_roundtrip()
+	_tools()
 	print("")
 	_check(_sections == EXPECTED_SECTIONS, "every section ran to its last line (%d of %d)" % [_sections, EXPECTED_SECTIONS])
 	_check(_passed + _failed == EXPECTED_CHECKS, "and the suite ran all %d of its checks (%d)" % [EXPECTED_CHECKS, _passed + _failed])
@@ -142,6 +143,38 @@ func _roundtrip() -> void:
 	var two := {"version": 1, "owner": "alice", "items": [{"prop": "a", "pos": [0, 0, 0]}, {"prop": "a", "pos": [0, 0, 0]}]}
 	_check(not small.load_dict(two).ok, "a loaded document is held to the budgets too")
 	_check(not _doc().load_dict({"version": 9, "items": []}).ok and not _doc().load_dict("nope").ok, "a wrong version or shape is refused")
+	_sections += 1
+
+
+func _tools() -> void:
+	var d := _doc()
+	var events: Array = []
+	d.changed.connect(func(kind: String, id: int) -> void: events.append(kind + str(id)))
+	d.costs = {"crate": 2.0}
+	d.place("alice", "crate", Vector3(0, 0, 0))
+	d.place("alice", "barrel", Vector3(10, 0, 0))
+	_check(d.total_cost() == 3.0 and d.count_by("alice") == 2 and d.revision == 2 and events == ["place1", "place2"], "running totals and the revision follow placements", str(events))
+	d.costs = {}
+	d.remove("alice", 1)
+	_check(d.total_cost() == 1.0 and d.count_by("alice") == 1 and d.has_item(2) and not d.has_item(1), "a removal gives back the price it was placed at")
+	var before := d.to_dict()
+	_check(d.set_scale("alice", 2, 2.0).ok and d.item(2)["scale"] == 2.0 and not d.set_scale("alice", 2, 99.0).ok and not d.set_scale("alice", 7, 1.0).ok, "set_scale changes within limits, refuses outside")
+	var dup := d.duplicate_item("alice", 2, Vector3(1, 0, 0))
+	_check(dup.ok and d.item(dup.value)["pos"] == [11.0, 0.0, 0.0] and d.item(dup.value)["scale"] == 2.0 and not d.duplicate_item("alice", 9, Vector3.ZERO).ok, "duplicate_item copies an item offset, budgets apply")
+	var df := d.diff_from(before)
+	_check(df == {"added": [dup.value], "removed": [], "changed": [2]}, "diff_from lists added, removed and changed ids", str(df))
+	_check(d.find_near(Vector3(10, 0, 0), 2.0).size() == 2 and d.find_near(Vector3(-50, 0, 0), 2.0).is_empty(), "find_near finds items within a radius")
+	d.editors = PackedStringArray(["bob"])
+	d.place("bob", "crate", Vector3(1, 0, 0))
+	_check(not d.remove_by("carol", "alice").ok, "remove_by needs the right to edit")
+	var gone := d.remove_by("alice", "bob")
+	_check(gone.ok and gone.value == 1 and d.count_by("bob") == 0 and d.count() == 2, "remove_by clears one actor's items")
+	_check(d.clear("alice").value == 2 and d.count() == 0 and d.total_cost() == 0.0, "clear empties the document and the totals")
+	var live := _doc()
+	live.config.max_items_per_actor = 1
+	live.place("alice", "crate", Vector3.ZERO)
+	live.remove("alice", 1)
+	_check(live.place("alice", "crate", Vector3.ZERO).ok, "a per-actor quota frees up when an item is removed")
 	_sections += 1
 
 
