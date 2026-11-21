@@ -1,4 +1,4 @@
-class_name DotEditorDocument
+class_name GSEditorDocument
 extends RefCounted
 
 ## A map document under construction: the items a build mode has placed, and the one door every edit goes
@@ -14,7 +14,7 @@ const VERSION := 1
 ## An item was placed, moved, scaled or removed (`kind` is "place", "move", "scale" or "remove"), or the document was cleared or loaded (id 0).
 signal changed(kind: String, id: int)
 
-var config: DotEditorConfig = DotEditorConfig.new()
+var config: GSEditorConfig = GSEditorConfig.new()
 var title: String = ""
 var owner: String = ""
 var editors: PackedStringArray = PackedStringArray()
@@ -82,33 +82,33 @@ func find_near(pos: Vector3, radius: float) -> PackedInt32Array:
 	return out
 
 
-func set_title(actor: String, text: String) -> DotResult:
+func set_title(actor: String, text: String) -> GSResult:
 	var gate := _gate(actor)
 	if not gate.ok:
 		return gate
 	if config.max_name_length > 0 and text.length() > config.max_name_length:
-		return DotResult.fail(DotError.CODE_INVALID, "a title is at most %d characters" % config.max_name_length)
+		return GSResult.fail(GSError.CODE_INVALID, "a title is at most %d characters" % config.max_name_length)
 	title = text
-	return DotResult.success(text)
+	return GSResult.success(text)
 
 
 ## Success carries the new item's id.
-func place(actor: String, prop: String, pos: Vector3, yaw: float = 0.0, scale: float = 1.0) -> DotResult:
+func place(actor: String, prop: String, pos: Vector3, yaw: float = 0.0, scale: float = 1.0) -> GSResult:
 	var gate := _gate(actor)
 	if not gate.ok:
 		return gate
 	if prop.is_empty() or (not config.allowed_props.is_empty() and not config.allowed_props.has(prop)) or (knows.is_valid() and not bool(knows.call(prop))):
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "prop '%s' cannot be placed here" % prop)
+		return GSResult.fail(GSError.CODE_FORBIDDEN, "prop '%s' cannot be placed here" % prop)
 	var shape := _shape(pos, scale)
 	if not shape.ok:
 		return shape
 	if config.max_items > 0 and _items.size() >= config.max_items:
-		return DotResult.fail(DotError.CODE_QUOTA, "the document is full: %d items" % config.max_items)
+		return GSResult.fail(GSError.CODE_QUOTA, "the document is full: %d items" % config.max_items)
 	if config.max_items_per_actor > 0 and count_by(actor) >= config.max_items_per_actor:
-		return DotResult.fail(DotError.CODE_QUOTA, "%s has placed %d items already" % [actor, config.max_items_per_actor])
+		return GSResult.fail(GSError.CODE_QUOTA, "%s has placed %d items already" % [actor, config.max_items_per_actor])
 	var price := cost_of(prop)
 	if config.max_cost > 0.0 and _total + price > config.max_cost:
-		return DotResult.fail(DotError.CODE_QUOTA, "over the budget: %.1f of %.1f" % [_total + price, config.max_cost])
+		return GSResult.fail(GSError.CODE_QUOTA, "over the budget: %.1f of %.1f" % [_total + price, config.max_cost])
 	var id := _next_id
 	_next_id += 1
 	var p := shape.value as Vector3
@@ -117,15 +117,15 @@ func place(actor: String, prop: String, pos: Vector3, yaw: float = 0.0, scale: f
 	_total += price
 	_per_actor[actor] = int(_per_actor.get(actor, 0)) + 1
 	_touch("place", id)
-	return DotResult.success(id)
+	return GSResult.success(id)
 
 
-func move(actor: String, id: int, pos: Vector3, yaw: float = NAN) -> DotResult:
+func move(actor: String, id: int, pos: Vector3, yaw: float = NAN) -> GSResult:
 	var gate := _gate(actor)
 	if not gate.ok:
 		return gate
 	if not _items.has(id):
-		return DotResult.fail(DotError.CODE_INVALID, "no item %d" % id)
+		return GSResult.fail(GSError.CODE_INVALID, "no item %d" % id)
 	var it: Dictionary = _items[id]
 	var shape := _shape(pos, float(it["scale"]))
 	if not shape.ok:
@@ -135,16 +135,16 @@ func move(actor: String, id: int, pos: Vector3, yaw: float = NAN) -> DotResult:
 	if not is_nan(yaw):
 		it["yaw"] = fposmod(yaw, 360.0)
 	_touch("move", id)
-	return DotResult.success(id)
+	return GSResult.success(id)
 
 
 ## Changes an item's scale, within the scale limits.
-func set_scale(actor: String, id: int, scale: float) -> DotResult:
+func set_scale(actor: String, id: int, scale: float) -> GSResult:
 	var gate := _gate(actor)
 	if not gate.ok:
 		return gate
 	if not _items.has(id):
-		return DotResult.fail(DotError.CODE_INVALID, "no item %d" % id)
+		return GSResult.fail(GSError.CODE_INVALID, "no item %d" % id)
 	var it: Dictionary = _items[id]
 	var p: Array = it["pos"]
 	var shape := _shape(Vector3(float(p[0]), float(p[1]), float(p[2])), scale)
@@ -152,20 +152,20 @@ func set_scale(actor: String, id: int, scale: float) -> DotResult:
 		return shape
 	it["scale"] = scale
 	_touch("scale", id)
-	return DotResult.success(id)
+	return GSResult.success(id)
 
 
 ## Places a copy of an item `offset` away, as `actor`. Success carries the new id; budgets apply.
-func duplicate_item(actor: String, id: int, offset: Vector3) -> DotResult:
+func duplicate_item(actor: String, id: int, offset: Vector3) -> GSResult:
 	if not _items.has(id):
-		return DotResult.fail(DotError.CODE_INVALID, "no item %d" % id)
+		return GSResult.fail(GSError.CODE_INVALID, "no item %d" % id)
 	var it: Dictionary = _items[id]
 	var p: Array = it["pos"]
 	return place(actor, str(it["prop"]), Vector3(float(p[0]), float(p[1]), float(p[2])) + offset, float(it["yaw"]), float(it["scale"]))
 
 
 ## Removes every item `who` placed (a player who left). Success carries how many went.
-func remove_by(actor: String, who: String) -> DotResult:
+func remove_by(actor: String, who: String) -> GSResult:
 	var gate := _gate(actor)
 	if not gate.ok:
 		return gate
@@ -176,18 +176,18 @@ func remove_by(actor: String, who: String) -> DotResult:
 			gone += 1
 	if gone > 0:
 		_touch("remove", 0)
-	return DotResult.success(gone)
+	return GSResult.success(gone)
 
 
 ## Removes everything. Success carries how many items went.
-func clear(actor: String) -> DotResult:
+func clear(actor: String) -> GSResult:
 	var gate := _gate(actor)
 	if not gate.ok:
 		return gate
 	var n := _items.size()
 	_reset_items()
 	_touch("remove", 0)
-	return DotResult.success(n)
+	return GSResult.success(n)
 
 
 ## What changed from `older` (a [method to_dict] result) to now: `{added: [ids], removed: [ids], changed: [ids]}`,
@@ -214,15 +214,15 @@ func diff_from(older: Dictionary) -> Dictionary:
 	return {"added": added, "removed": removed, "changed": changed_ids}
 
 
-func remove(actor: String, id: int) -> DotResult:
+func remove(actor: String, id: int) -> GSResult:
 	var gate := _gate(actor)
 	if not gate.ok:
 		return gate
 	if not _items.has(id):
-		return DotResult.fail(DotError.CODE_INVALID, "no item %d" % id)
+		return GSResult.fail(GSError.CODE_INVALID, "no item %d" % id)
 	_drop(id)
 	_touch("remove", id)
-	return DotResult.success(id)
+	return GSResult.success(id)
 
 
 func to_dict() -> Dictionary:
@@ -231,11 +231,11 @@ func to_dict() -> Dictionary:
 
 ## Loads a document that came off a disk or the wire. Every item is checked like a fresh placement
 ## (without the actor's right), so a hand-edited file cannot slip past the bounds or the budgets.
-func load_dict(d: Variant) -> DotResult:
+func load_dict(d: Variant) -> GSResult:
 	if not d is Dictionary or int((d as Dictionary).get("version", 0)) != VERSION or not (d as Dictionary).get("items") is Array:
-		return DotResult.fail(DotError.CODE_PARSE, "not a version %d editor document" % VERSION)
+		return GSResult.fail(GSError.CODE_PARSE, "not a version %d editor document" % VERSION)
 	var doc: Dictionary = d
-	var fresh := DotEditorDocument.new()
+	var fresh := GSEditorDocument.new()
 	fresh.config = config
 	fresh.costs = costs
 	fresh.knows = knows
@@ -244,11 +244,11 @@ func load_dict(d: Variant) -> DotResult:
 	for e: Variant in doc.get("editors", []):
 		fresh.editors.append(str(e))
 	if fresh.owner.is_empty():
-		return DotResult.fail(DotError.CODE_INVALID, "a document needs an owner")
+		return GSResult.fail(GSError.CODE_INVALID, "a document needs an owner")
 	var top := 0
 	for raw: Variant in doc["items"]:
 		if not raw is Dictionary or not (raw as Dictionary).get("pos") is Array or ((raw as Dictionary)["pos"] as Array).size() != 3:
-			return DotResult.fail(DotError.CODE_INVALID, "an item needs a prop and a three number pos")
+			return GSResult.fail(GSError.CODE_INVALID, "an item needs a prop and a three number pos")
 		var r: Dictionary = raw
 		var pa: Array = r["pos"]
 		var by := str(r.get("by", fresh.owner))
@@ -274,7 +274,7 @@ func load_dict(d: Variant) -> DotResult:
 	_per_actor = fresh._per_actor
 	_next_id = fresh._next_id
 	_touch("load", 0)
-	return DotResult.success(_items.size())
+	return GSResult.success(_items.size())
 
 
 func _touch(kind: String, id: int) -> void:
@@ -301,7 +301,7 @@ func _reset_items() -> void:
 	_total = 0.0
 
 
-func _place_as_owner(by: String, prop: String, pos: Vector3, yaw: float, scale: float) -> DotResult:
+func _place_as_owner(by: String, prop: String, pos: Vector3, yaw: float, scale: float) -> GSResult:
 	var saved := owner
 	owner = by
 	var r := place(by, prop, pos, yaw, scale)
@@ -309,20 +309,20 @@ func _place_as_owner(by: String, prop: String, pos: Vector3, yaw: float, scale: 
 	return r
 
 
-func _gate(actor: String) -> DotResult:
-	if not DotEditorPermissions.may_edit(config, owner, editors, actor):
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "%s may not edit this document" % (actor if not actor.is_empty() else "nobody"))
-	return DotResult.success()
+func _gate(actor: String) -> GSResult:
+	if not GSEditorPermissions.may_edit(config, owner, editors, actor):
+		return GSResult.fail(GSError.CODE_FORBIDDEN, "%s may not edit this document" % (actor if not actor.is_empty() else "nobody"))
+	return GSResult.success()
 
 
-func _shape(pos: Vector3, scale: float) -> DotResult:
+func _shape(pos: Vector3, scale: float) -> GSResult:
 	if is_nan(pos.x) or is_nan(pos.y) or is_nan(pos.z) or is_nan(scale):
-		return DotResult.fail(DotError.CODE_INVALID, "a position and scale must be numbers")
+		return GSResult.fail(GSError.CODE_INVALID, "a position and scale must be numbers")
 	if scale < config.min_scale or scale > config.max_scale:
-		return DotResult.fail(DotError.CODE_INVALID, "scale %.2f is outside %.2f to %.2f" % [scale, config.min_scale, config.max_scale])
+		return GSResult.fail(GSError.CODE_INVALID, "scale %.2f is outside %.2f to %.2f" % [scale, config.min_scale, config.max_scale])
 	var p := pos
 	if config.grid_snap > 0.0:
 		p = (pos / config.grid_snap).round() * config.grid_snap
 	if config.bounds_m > 0.0 and maxf(absf(p.x), maxf(absf(p.y), absf(p.z))) > config.bounds_m:
-		return DotResult.fail(DotError.CODE_INVALID, "position %s is outside %.0f m of the origin" % [p, config.bounds_m])
-	return DotResult.success(p)
+		return GSResult.fail(GSError.CODE_INVALID, "position %s is outside %.0f m of the origin" % [p, config.bounds_m])
+	return GSResult.success(p)

@@ -1,5 +1,5 @@
-class_name DotEditorConfig
-extends DotConfig
+class_name GSEditorConfig
+extends GSConfig
 
 ## Every tunable of Editor. Layered like any config: defaults, `cfg/addon/dot_editor/*.yml`, the game tier, `DOT_EDITOR_*` environment, then `--editor-*` flags. A value of 0 on a limit means unlimited.
 
@@ -43,13 +43,13 @@ func cli_prefix() -> String:
 	return "--editor-"
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	for k in ["max_items", "max_items_per_actor", "max_cost", "bounds_m", "grid_snap", "max_name_length"]:
 		if float(get(k)) < 0.0:
-			return DotResult.fail(DotError.CODE_INVALID, "editor %s must be 0 (unlimited) or more, got %s" % [k, get(k)])
+			return GSResult.fail(GSError.CODE_INVALID, "editor %s must be 0 (unlimited) or more, got %s" % [k, get(k)])
 	if min_scale > max_scale:
-		return DotResult.fail(DotError.CODE_INVALID, "editor min_scale %s is over max_scale %s" % [min_scale, max_scale])
-	return DotResult.success(self)
+		return GSResult.fail(GSError.CODE_INVALID, "editor min_scale %s is over max_scale %s" % [min_scale, max_scale])
+	return GSResult.success(self)
 
 func describe() -> String:
 	return "editor %s who %d items<=%d cost<=%.0f bounds %.0fm snap %.2f" % [
@@ -59,7 +59,7 @@ func describe() -> String:
 ## The `editor` profile schema (the shape of GameSpice Profile's field()), read from the exports so it cannot drift; GameSpice Profile's profile_check finds it here.
 static func schema() -> Array:
 	var out: Array = []
-	var cfg := DotEditorConfig.new()
+	var cfg := GSEditorConfig.new()
 	for prop: Dictionary in cfg.get_property_list():
 		if not (int(prop["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE) or not (int(prop["usage"]) & PROPERTY_USAGE_EDITOR):
 			continue
@@ -89,9 +89,9 @@ static func profile_schemas() -> Dictionary:
 
 
 ## Defaults, then `cfg/addon/dot_editor/*.yml` and the game tier, then environment and command line.
-static func from_files() -> DotResult:
-	var cfg := DotEditorConfig.new()
-	var files := DotAddonConfig.load_dir(ADDON)
+static func from_files() -> GSResult:
+	var cfg := GSEditorConfig.new()
+	var files := GSAddonConfig.load_dir(ADDON)
 	if not files.ok:
 		return files
 	cfg.apply_dictionary(files.value as Dictionary, "yml")

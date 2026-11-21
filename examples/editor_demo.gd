@@ -3,7 +3,7 @@ extends Node
 
 
 func _ready() -> void:
-	var d := DotEditorDocument.new()
+	var d := GSEditorDocument.new()
 	d.owner = "alice"
 	d.changed.connect(func(kind: String, id: int) -> void: print("changed ", kind, " ", id))
 	var crate := d.place("alice", "crate", Vector3(2, 0, 3), 45.0)

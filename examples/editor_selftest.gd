@@ -27,14 +27,14 @@ func _ready() -> void:
 	get_tree().quit(1 if _failed > 0 else 0)
 
 
-func _doc() -> DotEditorDocument:
-	var d := DotEditorDocument.new()
+func _doc() -> GSEditorDocument:
+	var d := GSEditorDocument.new()
 	d.owner = "alice"
 	return d
 
 
 func _config() -> void:
-	var c := DotEditorConfig.new()
+	var c := GSEditorConfig.new()
 	_check(c.validate().ok and c.max_items == 500, "defaults validate")
 	c.max_items = -1
 	_check(not c.validate().ok, "a negative limit is refused, 0 means unlimited")
@@ -42,31 +42,31 @@ func _config() -> void:
 	c.min_scale = 5.0
 	c.max_scale = 1.0
 	_check(not c.validate().ok, "min_scale over max_scale is refused")
-	var names: Array = DotEditorConfig.profile_schemas()["editor"]["schema"].map(func(f: Dictionary) -> Variant: return f["name"])
+	var names: Array = GSEditorConfig.profile_schemas()["editor"]["schema"].map(func(f: Dictionary) -> Variant: return f["name"])
 	_check(names.has("max_cost") and names.has("allowed_props") and names.size() == c.config_keys().size(), "profile schema lists every key", str(names.size()))
 	var applied := c.apply_dictionary({"max_items": 9, "grid_snap": 0.5, "allowed_props": ["crate"]})
 	_check(applied.size() == 3 and c.max_items == 9 and c.grid_snap == 0.5 and c.allowed_props.size() == 1, "a dictionary layer sets ints, floats and lists", str(applied))
 	_check(c.env_prefix() == "DOT_EDITOR_" and c.cli_prefix() == "--editor-", "env and command-line prefixes")
-	var r := DotEditorConfig.from_files()
-	_check(r.ok and (r.value as DotEditorConfig).describe().begins_with("editor"), "from_files returns a config")
+	var r := GSEditorConfig.from_files()
+	_check(r.ok and (r.value as GSEditorConfig).describe().begins_with("editor"), "from_files returns a config")
 	_sections += 1
 
 
 func _permissions() -> void:
-	var c := DotEditorConfig.new()
+	var c := GSEditorConfig.new()
 	var eds := PackedStringArray(["bob"])
-	_check(DotEditorPermissions.may_edit(c, "alice", eds, "alice") and DotEditorPermissions.may_edit(c, "alice", eds, "bob"), "the owner and a listed editor may edit")
-	_check(not DotEditorPermissions.may_edit(c, "alice", eds, "carol"), "a stranger may not")
-	c.who_may_edit = DotEditorConfig.new().who_may_edit
+	_check(GSEditorPermissions.may_edit(c, "alice", eds, "alice") and GSEditorPermissions.may_edit(c, "alice", eds, "bob"), "the owner and a listed editor may edit")
+	_check(not GSEditorPermissions.may_edit(c, "alice", eds, "carol"), "a stranger may not")
+	c.who_may_edit = GSEditorConfig.new().who_may_edit
 	c.who_may_edit = 0
-	_check(not DotEditorPermissions.may_edit(c, "alice", eds, "bob"), "owner-only mode shuts the list out")
+	_check(not GSEditorPermissions.may_edit(c, "alice", eds, "bob"), "owner-only mode shuts the list out")
 	c.who_may_edit = 2
-	_check(DotEditorPermissions.may_edit(c, "alice", eds, "carol") and not DotEditorPermissions.may_edit(c, "alice", eds, ""), "anyone mode still needs an identity")
+	_check(GSEditorPermissions.may_edit(c, "alice", eds, "carol") and not GSEditorPermissions.may_edit(c, "alice", eds, ""), "anyone mode still needs an identity")
 	c.enabled = false
-	_check(not DotEditorPermissions.may_edit(c, "alice", eds, "alice"), "a disabled editor refuses everyone")
+	_check(not GSEditorPermissions.may_edit(c, "alice", eds, "alice"), "a disabled editor refuses everyone")
 	var d := _doc()
 	var r := d.place("mallory", "crate", Vector3.ZERO)
-	_check(not r.ok and r.error.code == DotError.CODE_FORBIDDEN and d.count() == 0, "the document refuses a stranger's edit")
+	_check(not r.ok and r.error.code == GSError.CODE_FORBIDDEN and d.count() == 0, "the document refuses a stranger's edit")
 	_sections += 1
 
 
@@ -102,7 +102,7 @@ func _budgets() -> void:
 	d.place("alice", "a", Vector3.ZERO)
 	d.place("alice", "a", Vector3.ZERO)
 	var r := d.place("alice", "a", Vector3.ZERO)
-	_check(not r.ok and r.error.code == DotError.CODE_QUOTA and d.count() == 2, "max_items refuses the item past it with a quota error")
+	_check(not r.ok and r.error.code == GSError.CODE_QUOTA and d.count() == 2, "max_items refuses the item past it with a quota error")
 	d.config.max_items = 0
 	_check(d.place("alice", "a", Vector3.ZERO).ok, "max_items 0 is unlimited")
 	var e := _doc()

@@ -12,8 +12,8 @@ A build mode on a shared server cannot trust the client. The document lives on t
 ## Quick start
 
 ```gdscript
-var doc := DotEditorDocument.new()
-doc.config = cfg                                   # a DotEditorConfig
+var doc := GSEditorDocument.new()
+doc.config = cfg                                   # a GSEditorConfig
 doc.owner = "alice"
 doc.editors = PackedStringArray(["bob"])
 doc.costs = {"tree": 6.0}                          # a prop not listed costs default_prop_cost
@@ -44,7 +44,7 @@ var back := doc.load_dict(JSON.parse_string(saved))   # checked item by item, un
 
 ## Settings
 
-Every number is a field on `DotEditorConfig`. The values below are defaults, and the ranges are inspector slider limits, not enforced caps. Set the property from code or a config file to go beyond them; 0 means unlimited where it says so.
+Every number is a field on `GSEditorConfig`. The values below are defaults, and the ranges are inspector slider limits, not enforced caps. Set the property from code or a config file to go beyond them; 0 means unlimited where it says so.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
@@ -60,7 +60,7 @@ Every number is a field on `DotEditorConfig`. The values below are defaults, and
 | `min_scale / max_scale` | 0.25 / 4.0 | Scale limits of one item. |
 | `max_name_length` | 64 | Longest document title. 0 is unlimited. |
 
-Layers, weakest first: the defaults, `cfg/addon/dot_editor/*.yml`, the game's files, the operator's files, `DOT_EDITOR_*` environment variables, then `--editor-*` flags. A game that wants cvars binds the config with GameSpice Game's `DotGameConfigBinder` (`profile_kind = "editor"`).
+Layers, weakest first: the defaults, `cfg/addon/dot_editor/*.yml`, the game's files, the operator's files, `DOT_EDITOR_*` environment variables, then `--editor-*` flags. A game that wants cvars binds the config with GameSpice Game's `GSGameConfigBinder` (`profile_kind = "editor"`).
 
 ## What it is not
 
