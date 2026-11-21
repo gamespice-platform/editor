@@ -6,7 +6,7 @@ A build mode on a shared server cannot trust the client. The document lives on t
 
 ## Install
 
-1. Copy `addons/dot_editor/` and `addons/dot_core/` into your project.
+1. Copy `addons/gs_editor/` and `addons/gs_core/` into your project.
 2. Enable GameSpice Editor in *Project > Project Settings > Plugins*.
 
 ## Quick start
@@ -60,7 +60,7 @@ Every number is a field on `GSEditorConfig`. The values below are defaults, and 
 | `min_scale / max_scale` | 0.25 / 4.0 | Scale limits of one item. |
 | `max_name_length` | 64 | Longest document title. 0 is unlimited. |
 
-Layers, weakest first: the defaults, `cfg/addon/dot_editor/*.yml`, the game's files, the operator's files, `DOT_EDITOR_*` environment variables, then `--editor-*` flags. A game that wants cvars binds the config with GameSpice Game's `GSGameConfigBinder` (`profile_kind = "editor"`).
+Layers, weakest first: the defaults, `cfg/addon/gs_editor/*.yml`, the game's files, the operator's files, `GS_EDITOR_*` environment variables, then `--editor-*` flags. A game that wants cvars binds the config with GameSpice Game's `GSGameConfigBinder` (`profile_kind = "editor"`).
 
 ## What it is not
 

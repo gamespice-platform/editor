@@ -3,7 +3,7 @@ config_version=5
 
 [application]
 
-config/name="dot-editor"
+config/name="gs-editor"
 config/description="In-game build mode: place props, keep the result as a map document, and check every edit against permissions, bounds and budgets before it is accepted."
 run/main_scene="res://examples/editor_selftest.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
@@ -11,7 +11,7 @@ config/icon="res://icon.svg"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/dot_editor/plugin.cfg")
+enabled=PackedStringArray("res://addons/gs_editor/plugin.cfg")
 
 [rendering]
 

@@ -1,9 +1,9 @@
 class_name GSEditorConfig
 extends GSConfig
 
-## Every tunable of Editor. Layered like any config: defaults, `cfg/addon/dot_editor/*.yml`, the game tier, `DOT_EDITOR_*` environment, then `--editor-*` flags. A value of 0 on a limit means unlimited.
+## Every tunable of Editor. Layered like any config: defaults, `cfg/addon/gs_editor/*.yml`, the game tier, `GS_EDITOR_*` environment, then `--editor-*` flags. A value of 0 on a limit means unlimited.
 
-const ADDON := "dot-editor"
+const ADDON := "gs-editor"
 
 ## Master switch: off, every edit is refused.
 @export var enabled: bool = true
@@ -36,7 +36,7 @@ const ADDON := "dot-editor"
 @export_range(0, 1000, 1) var max_name_length: int = 64
 
 func env_prefix() -> String:
-	return "DOT_EDITOR_"
+	return "GS_EDITOR_"
 
 
 func cli_prefix() -> String:
@@ -88,7 +88,7 @@ static func profile_schemas() -> Dictionary:
 	return {"editor": {"schema": schema(), "children": {}}}
 
 
-## Defaults, then `cfg/addon/dot_editor/*.yml` and the game tier, then environment and command line.
+## Defaults, then `cfg/addon/gs_editor/*.yml` and the game tier, then environment and command line.
 static func from_files() -> GSResult:
 	var cfg := GSEditorConfig.new()
 	var files := GSAddonConfig.load_dir(ADDON)
