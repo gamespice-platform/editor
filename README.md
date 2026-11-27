@@ -2,6 +2,8 @@
 
 In-game build mode, for Godot 4.7+. It holds the map a player is building as a document, and every place, move and remove goes through one door that checks who is allowed, which prop, where, how big, and what is left of the budget. Publishing the result is GameSpice Cloud's job. Part of the [GameSpice](https://github.com/gamespice-platform) family. It needs only [GameSpice Core](https://github.com/gamespice-platform/core).
 
+A GameSpice addon, MIT licensed and built with Claude Code, with an offline headless self-test (`res://examples/editor_selftest.tscn`). The games in [Zee's Games](https://zeesgames.com) are built on the GameSpice addons and run on live servers, which is the setting this build mode is made for.
+
 A build mode on a shared server cannot trust the client. The document lives on the server, a client asks to change it, and the server answers with success or a reason. Nothing is clamped silently, and a hand-edited file is held to the same rules as a fresh placement when it loads.
 
 ## Install
@@ -79,11 +81,11 @@ godot --headless --path . --import
 godot --headless --path . res://examples/editor_selftest.tscn
 ```
 
-The self-test is offline and exits non-zero on any failure (6 sections, 50 checks plus the two summary checks).
+The self-test is offline and exits non-zero on any failure.
 
-## Status
+## Used by
 
-Built and maintained with Claude Code. The test suites pass, but little of this has been in front of real players yet. Please report rough edges by opening an issue.
+No shipped game vendors it yet. The example scene shows it. The whole collection is at [zeesgames.com](https://zeesgames.com).
 
 ## Licence
 
